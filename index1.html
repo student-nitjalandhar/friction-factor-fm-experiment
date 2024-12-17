@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipe Friction Experiment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        header {
+            background-color: #004080;
+            color: white;
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-section {
+            margin-bottom: 2rem;
+        }
+
+        .input-section label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .input-section input {
+            width: calc(100% - 10px);
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.7rem 1.5rem;
+            background-color: #004080;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background-color: #003060;
+        }
+
+        .results {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #e6f7ff;
+            border-radius: 8px;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+            margin-top: 2rem;
+        }
+
+        .simulation {
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        #simulationCanvas {
+            border: 1px solid #ccc;
+            background: #eef7ff;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Pipe Friction Experiment</h1>
+    </header>
+
+    <div class="container">
+        <div class="input-section">
+            <label for="pipe-diameter">Pipe Diameter (m):</label>
+            <input type="number" id="pipe-diameter" placeholder="e.g., 0.05">
+
+            <label for="pipe-length">Pipe Length (m):</label>
+            <input type="number" id="pipe-length" placeholder="e.g., 10">
+
+            <label for="velocity">Velocity (m/s):</label>
+            <input type="number" id="velocity" placeholder="e.g., 1.5">
+
+            <label for="head-loss">Head Loss (m):</label>
+            <input type="number" id="head-loss" placeholder="e.g., 0.3">
+
+            <button class="btn" onclick="calculateFriction()">Calculate & Simulate</button>
+        </div>
+
+        <div class="results" id="results">
+            <h2>Results</h2>
+            <p id="friction-coefficient">Friction Coefficient: N/A</p>
+            <p id="pressure-loss">Pressure Loss: N/A</p>
+        </div>
+
+        <canvas id="plotCanvas" width="800" height="400"></canvas>
+
+        <div class="simulation">
+            <h2>Simulation</h2>
+            <canvas id="simulationCanvas" width="800" height="300"></canvas>
+        </div>
+    </div>
+
+    <script>
+        function calculateFriction() {
+            const g = 9.81; // Acceleration due to gravity in m/s²
+            const density = 1000; // Density of water in kg/m³
+            const diameter = parseFloat(document.getElementById("pipe-diameter").value);
+            const length = parseFloat(document.getElementById("pipe-length").value);
+            const velocity = parseFloat(document.getElementById("velocity").value);
+            const headLoss = parseFloat(document.getElementById("head-loss").value);
+
+            if (isNaN(diameter) || isNaN(length) || isNaN(velocity) || isNaN(headLoss)) {
+                alert("Please enter valid inputs for all fields.");
+                return;
+            }
+
+            // Calculate friction factor using the formula f = (2g * d * h_f) / (L * v^2)
+            const frictionFactor = (2 * g * diameter * headLoss) / (length * Math.pow(velocity, 2));
+
+            // Calculate pressure loss using h_f and density
+            const pressureLoss = density * g * headLoss;
+
+            // Display results
+            document.getElementById("friction-coefficient").innerText = `Friction Coefficient: ${frictionFactor.toFixed(5)}`;
+            document.getElementById("pressure-loss").innerText = `Pressure Loss: ${pressureLoss.toFixed(2)} Pa`;
+
+            // Plot the graph
+            plotGraph(velocity, pressureLoss);
+
+            // Start simulation
+            startSimulation(velocity);
+        }
+
+        function plotGraph(flowRate, pressureLoss) {
+            const canvas = document.getElementById("plotCanvas");
+            const ctx = canvas.getContext("2d");
+
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw axes
+            ctx.beginPath();
+            ctx.moveTo(50, 350);
+            ctx.lineTo(750, 350); // X-axis
+            ctx.lineTo(50, 50);  // Y-axis
+            ctx.stroke();
+
+            // Labels
+            ctx.font = "14px Arial";
+            ctx.fillText("Flow Rate (m/s)", 400, 380);
+            ctx.fillText("Pressure Loss (Pa)", 10, 30);
+
+            // Plot the point
+            const x = 50 + (flowRate * 100); // Scale flow rate
+            const y = 350 - (pressureLoss / 10); // Scale pressure loss
+
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = "red";
+            ctx.fill();
+
+            // Annotate the point
+            ctx.fillStyle = "black";
+            ctx.fillText(`(${flowRate.toFixed(2)}, ${pressureLoss.toFixed(2)})`, x + 10, y - 10);
+        }
+
+        function startSimulation(velocity) {
+            const canvas = document.getElementById("simulationCanvas");
+            const ctx = canvas.getContext("2d");
+
+            let waterX = 50;
+            const pipeY = 120;
+            const pipeWidth = 700;
+            const pipeHeight = 60;
+
+            function drawPipe() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw pipe
+                ctx.fillStyle = "#cccccc";
+                ctx.fillRect(50, pipeY, pipeWidth, pipeHeight);
+
+                // Draw water
+                ctx.fillStyle = "blue";
+                ctx.fillRect(waterX, pipeY + 10, 40, pipeHeight - 20);
+
+                // Draw pressure indicators
+                ctx.font = "14px Arial";
+                ctx.fillStyle = "black";
+                ctx.fillText("High Pressure", 60, pipeY - 10);
+                ctx.fillText("Low Pressure", 700, pipeY - 10);
+            }
+
+            function animateWater() {
+                if (waterX < pipeWidth) {
+                    waterX += velocity / 10; // Adjust speed based on velocity
+                    drawPipe();
+                    requestAnimationFrame(animateWater);
+                }
+            }
+
+            drawPipe();
+            animateWater();
+        }
+    </script>
+</body>
+</html>
